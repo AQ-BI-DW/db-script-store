@@ -19,7 +19,7 @@ truncate table golden.cw_contact
 insert into golden.person (clusterid,first_name,last_name,create_date,mod_date)
 (
 select distinct seq_cluster_key,'','',now(),now()
-from tmp_match_set_out_mf
+from tmp_match_set_out  --  _mf
 );
 
 ---- tbl2
@@ -27,7 +27,7 @@ insert into golden.cw_contact (cw_contact_id,gold_person_id)
 (
 select distinct mto.person_id
     ,   gp.gold_person_id
-from idq.tmp_match_set_out_mf mto 
+from idq.tmp_match_set_out mto --  _mf mto 
 left outer join golden.person gp on mto.seq_cluster_key = gp.clusterid
 );
 
