@@ -7,73 +7,87 @@ CREATE OR REPLACE VIEW golden.vw_golden_db_persons
 AS
 /*
     v1.0 2018-09-23 vw for profiling outcome
+    v1.0 2018-10-30
 */
-
+GO
 
 SELECT DISTINCT gp.gold_person_id
     ,   gcon.cw_contact_id
-    ,   mso.seq_cluster_mt_2 final_mach_grp
-    ,   mso.seq_cluster_mt_1 lnk_id_grp
-    ,   (case when lig.seq_cluster_mt_1 is not null
-            then 'true'  else 'false' end) as grouped_match_1 
-    ,   (case when fgp.seq_cluster_key is not null
-            then 'true'  else 'false' end) as grouped_match_2
-   -- ,   (mso.linkedscore) min_match_score
-   -- ,   (mso.linkedscore) max_match_score
-    ,   mso.first_name
-    ,   mso.middle_name
-    ,   mso.last_name
+   
+    ,   fcs.first_name
+    ,   fcs.middle_name
+    ,   fcs.last_name
+
     ,   fcs.city
     ,   fcs.state
-    ,   mso.postal_code
+    ,   fcs.postal_code
   --  ,   country
-    ,   mso.company_name
-    ,   mso.norm_city
-    ,   mso.norm_state
-    ,   mso.main_phone
-    ,   mso.current_phone
-    ,   mso.cell_mobile_phone
-    ,   mso.email
-    ,   mso.private_email
-    ,   mso.url
-    ,   mso.norm_gender
-  --  , mso.*
+    ,   fcs.company_name
+    ,   fcs.norm_city
+    ,   fcs.norm_state
+    ,   fcs.main_phone
+    ,   fcs.current_phone
+    ,   fcs.cell_mobile_phone
+    ,   fcs.email
+    ,   fcs.private_email
+    ,   fcs.url
+    ,   fcs.address_1
+
 FROM golden.person gp
 JOIN golden.cw_contact gcon on gp.gold_person_id = gcon.gold_person_id
-JOIN idq.tmp_match_set_out_mf mso on gcon.cw_contact_id = mso.person_id
+--- JOIN idq.tmp_full_contact_set mso on gcon.cw_contact_id = mso.person_id
 JOIN idq.tmp_full_contact_set fcs on gcon.cw_contact_id = fcs.person_id
 
--------
-LEFT OUTER JOIN 
-    (
-    SELECT mso.seq_cluster_mt_1
-        , count(mso.person_id)  num_ids
-        
-    FROM idq.tmp_match_set_out_bak mso 
-    GROUP BY mso.seq_cluster_mt_1
-    HAVING count(mso.person_id) > 1
-    ) lig on mso.seq_cluster_mt_1 = lig.seq_cluster_mt_1
--------------
-LEFT OUTER JOIN 
-    (
-    SELECT mso.seq_cluster_key
-        , count(mso.person_id)  num_ids
-        
-    FROM idq.tmp_match_set_out_mf mso 
-    GROUP BY mso.seq_cluster_key
-    HAVING count(mso.person_id) > 1
-    ) fgp on mso.seq_cluster_key = fgp.seq_cluster_key   
 
-/*
-    (
-        (case when lig.seq_cluster_mt_1 is not null
-            then 1  else 0 end)::boolean
-     ) = true 
-     and
-    (
-        (case when fgp.seq_cluster_key is not null
-            then 1  else 0 end)::boolean
-    ) = false
-*/
+-------------------
 
-;
+GO
+
+CREATE MATERIALIZED VIEW golden.mv_golden_db_persons
+	AS
+	SELECT gp.gold_person_id,
+    gcon.cw_contact_id,
+    mso.seq_cluster_mt_2 AS final_mach_grp,
+    mso.seq_cluster_mt_1 AS lnk_id_grp,
+        CASE
+            WHEN (lig.seq_cluster_mt_1 IS NOT NULL) THEN 'true'::text
+            ELSE 'false'::text
+        END AS grouped_match_1,
+        CASE
+            WHEN (fgp.seq_cluster_key IS NOT NULL) THEN 'true'::text
+            ELSE 'false'::text
+        END AS grouped_match_2,
+    mso.first_name,
+    mso.middle_name,
+    mso.last_name,
+    fcs.city,
+    fcs.state,
+    mso.postal_code,
+    mso.company_name,
+    mso.norm_city,
+    mso.norm_state,
+    mso.main_phone,
+    mso.current_phone,
+    mso.cell_mobile_phone,
+    mso.email,
+    mso.private_email,
+    mso.url,
+    mso.norm_gender
+   FROM (((((person gp
+     JOIN cw_contact gcon ON ((gp.gold_person_id = gcon.gold_person_id)))
+     JOIN tmp_match_set_out_mf mso ON ((gcon.cw_contact_id = mso.person_id)))
+     JOIN tmp_full_contact_set fcs ON ((gcon.cw_contact_id = fcs.person_id)))
+     LEFT JOIN ( SELECT mso_1.seq_cluster_mt_1,
+            count(mso_1.person_id) AS num_ids
+           FROM tmp_match_set_out_bak mso_1
+          GROUP BY mso_1.seq_cluster_mt_1
+         HAVING (count(mso_1.person_id) > 1)) lig ON (((mso.seq_cluster_mt_1)::text = (lig.seq_cluster_mt_1)::text)))
+     LEFT JOIN ( SELECT mso_1.seq_cluster_key,
+            count(mso_1.person_id) AS num_ids
+           FROM tmp_match_set_out_mf mso_1
+          GROUP BY mso_1.seq_cluster_key
+         HAVING (count(mso_1.person_id) > 1)) fgp ON (((mso.seq_cluster_key)::text = (fgp.seq_cluster_key)::text)))
+WITH DATA
+GO
+ALTER MATERIALIZED VIEW golden.mv_golden_db_persons OWNER TO idqadmin
+GO
